@@ -1,0 +1,19 @@
+name = "favorites"
+main = "worker.js"
+account_id = "8a0d49b1f3fdcdadec135562ec8a4fdc" # TechGuyWithABeard — never another account
+compatibility_date = "2025-10-01"
+
+# Static assets are matched before the Worker runs; worker.js only ever sees
+# /api/state in practice.
+[assets]
+directory = "./public"
+
+[[kv_namespaces]]
+binding = "SHORTCUTS_KV"
+id = "71257de3aef04824ad72e7597d0ed8ac"
+
+[[routes]]
+pattern = "favorites.mykk.us"
+custom_domain = true
+
+# SYNC_TOKEN is a Worker secret: `wrangler secret put SYNC_TOKEN`

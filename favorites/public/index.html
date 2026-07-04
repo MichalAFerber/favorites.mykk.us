@@ -1,0 +1,658 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Favorites</title>
+<style>
+  :root {
+    --bg: #111418;
+    --fg: #e8eaed;
+    --fg-dim: #9aa0a6;
+    --tile-bg: rgba(255, 255, 255, 0.06);
+    --tile-bg-hover: rgba(255, 255, 255, 0.12);
+    --surface: #1d2126;
+    --surface-border: rgba(255, 255, 255, 0.12);
+    --accent: #8ab4f8;
+    --danger: #f28b82;
+    --input-bg: rgba(255, 255, 255, 0.08);
+  }
+  :root[data-theme="light"] {
+    --bg: #f1f3f4;
+    --fg: #202124;
+    --fg-dim: #5f6368;
+    --tile-bg: rgba(255, 255, 255, 0.85);
+    --tile-bg-hover: #ffffff;
+    --surface: #ffffff;
+    --surface-border: rgba(0, 0, 0, 0.12);
+    --accent: #1a73e8;
+    --danger: #d93025;
+    --input-bg: rgba(0, 0, 0, 0.05);
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body { height: 100%; }
+
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    color: var(--fg);
+    background-color: var(--bg);
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+  }
+
+  header {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 16px 20px 0;
+  }
+
+  .icon-btn {
+    appearance: none;
+    border: none;
+    background: var(--tile-bg);
+    color: var(--fg);
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+    backdrop-filter: blur(6px);
+  }
+  .icon-btn:hover { background: var(--tile-bg-hover); }
+
+  main {
+    max-width: 820px;
+    margin: 0 auto;
+    padding: 32px 16px 64px;
+  }
+
+  #grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+    gap: 12px;
+  }
+
+  .tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    padding: 18px 8px 14px;
+    border-radius: 16px;
+    background: var(--tile-bg);
+    color: var(--fg);
+    text-decoration: none;
+    text-align: center;
+    backdrop-filter: blur(6px);
+    -webkit-touch-callout: none;
+    user-select: none;
+    touch-action: manipulation;
+  }
+  .tile:hover { background: var(--tile-bg-hover); }
+
+  .tile .icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+  .tile .icon img {
+    width: 32px;
+    height: 32px;
+    max-width: 100%;
+  }
+  .tile .avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    font-weight: 600;
+    color: #fff;
+  }
+  .tile .label {
+    font-size: 13px;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  #empty {
+    text-align: center;
+    color: var(--fg-dim);
+    margin-top: 15vh;
+    font-size: 15px;
+  }
+
+  dialog {
+    border: 1px solid var(--surface-border);
+    border-radius: 16px;
+    background: var(--surface);
+    color: var(--fg);
+    padding: 24px;
+    width: min(420px, calc(100vw - 32px));
+  }
+  dialog::backdrop { background: rgba(0, 0, 0, 0.5); }
+
+  dialog h2 {
+    margin: 0 0 16px;
+    font-size: 17px;
+    font-weight: 600;
+  }
+  dialog h3 {
+    margin: 20px 0 4px;
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--fg-dim);
+  }
+
+  label {
+    display: block;
+    font-size: 13px;
+    color: var(--fg-dim);
+    margin: 12px 0 4px;
+  }
+
+  input[type="text"], input[type="url"], input[type="password"], select {
+    width: 100%;
+    padding: 9px 10px;
+    border: 1px solid var(--surface-border);
+    border-radius: 8px;
+    background: var(--input-bg);
+    color: var(--fg);
+    font-size: 14px;
+  }
+
+  .hint { font-size: 12px; color: var(--fg-dim); margin: 4px 0 0; }
+
+  .row {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    margin-top: 20px;
+  }
+  .row .spacer { margin-right: auto; }
+
+  button.btn {
+    appearance: none;
+    border: none;
+    border-radius: 8px;
+    padding: 9px 16px;
+    font-size: 14px;
+    cursor: pointer;
+    background: var(--input-bg);
+    color: var(--fg);
+  }
+  button.btn.primary { background: var(--accent); color: var(--bg); font-weight: 600; }
+  button.btn.danger { background: transparent; color: var(--danger); }
+  button.btn.danger.armed { background: var(--danger); color: #fff; }
+
+  #toast {
+    position: fixed;
+    left: 50%;
+    bottom: 24px;
+    transform: translateX(-50%);
+    background: var(--surface);
+    border: 1px solid var(--surface-border);
+    color: var(--fg);
+    padding: 10px 18px;
+    border-radius: 10px;
+    font-size: 14px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+  }
+  #toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<header>
+  <button class="icon-btn" id="addBtn" title="Add shortcut" aria-label="Add shortcut">+</button>
+  <button class="icon-btn" id="settingsBtn" title="Settings" aria-label="Settings">&#9881;</button>
+</header>
+
+<main>
+  <div id="grid"></div>
+  <div id="empty" hidden>No shortcuts yet — tap + to add one.<br><span class="hint">Long-press a tile to edit or delete it.</span></div>
+</main>
+
+<dialog id="editDialog">
+  <h2 id="editTitle">Add shortcut</h2>
+  <form id="editForm" method="dialog">
+    <label for="editName">Name</label>
+    <input type="text" id="editName" required maxlength="60" autocomplete="off">
+    <label for="editUrl">URL</label>
+    <input type="text" id="editUrl" required autocomplete="off" placeholder="https://example.com" inputmode="url">
+    <div class="row">
+      <button type="button" class="btn danger spacer" id="deleteBtn" hidden>Delete</button>
+      <button type="button" class="btn" id="editCancel">Cancel</button>
+      <button type="submit" class="btn primary" id="editSave">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="settingsDialog">
+  <h2>Settings</h2>
+
+  <h3>Appearance</h3>
+  <label for="setTheme">Theme</label>
+  <select id="setTheme">
+    <option value="dark">Dark</option>
+    <option value="light">Light</option>
+  </select>
+  <label for="setWallpaper">Wallpaper URL</label>
+  <input type="text" id="setWallpaper" autocomplete="off" placeholder="https://…/image.jpg (optional)">
+  <label for="setBgColor">Background color</label>
+  <input type="text" id="setBgColor" autocomplete="off" placeholder="#111418 (optional)">
+
+  <h3>Sync</h3>
+  <p class="hint">Stored only on this device — never included in synced data. Leave blank for local-only mode.</p>
+  <label for="setEndpoint">Endpoint</label>
+  <input type="text" id="setEndpoint" autocomplete="off" placeholder="https://favorites.mykk.us/api/state">
+  <label for="setToken">Token</label>
+  <input type="password" id="setToken" autocomplete="off">
+  <p class="hint" id="syncStatus"></p>
+
+  <div class="row">
+    <button type="button" class="btn" id="settingsCancel">Cancel</button>
+    <button type="button" class="btn primary" id="settingsSave">Save</button>
+  </div>
+</dialog>
+
+<div id="toast" role="status"></div>
+
+<script>
+"use strict";
+
+/* ---------- constants & storage ---------- */
+
+const LS_STATE = "favorites:state"; // synced document (shortcuts + settings)
+const LS_SYNC  = "favorites:sync";  // device-local: { endpoint, token } — never synced
+
+const $ = (id) => document.getElementById(id);
+
+function defaultState() {
+  return {
+    shortcuts: [],
+    settings: { theme: "dark", wallpaperUrl: "", bgColor: "" },
+    updatedAt: 0,
+  };
+}
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(LS_STATE);
+    if (!raw) return defaultState();
+    const doc = JSON.parse(raw);
+    if (!doc || !Array.isArray(doc.shortcuts)) return defaultState();
+    doc.settings = Object.assign(defaultState().settings, doc.settings);
+    doc.updatedAt = Number(doc.updatedAt) || 0;
+    return doc;
+  } catch {
+    return defaultState();
+  }
+}
+
+function loadSyncConfig() {
+  try {
+    const cfg = JSON.parse(localStorage.getItem(LS_SYNC) || "null");
+    return cfg && cfg.endpoint && cfg.token ? cfg : null;
+  } catch {
+    return null;
+  }
+}
+
+let state = loadState();
+let syncConfig = loadSyncConfig();
+
+/* ---------- persistence: every mutation funnels through persist() ---------- */
+
+function persist() {
+  state.updatedAt = Date.now();
+  saveLocal();
+  render();
+  applySettings();
+  schedulePush();
+}
+
+function saveLocal() {
+  localStorage.setItem(LS_STATE, JSON.stringify(state));
+}
+
+/* ---------- sync (last-write-wins on updatedAt, whole document) ---------- */
+
+let pushTimer = null;
+
+function schedulePush() {
+  if (!syncConfig) return;
+  clearTimeout(pushTimer);
+  pushTimer = setTimeout(push, 800);
+}
+
+async function push() {
+  if (!syncConfig) return;
+  try {
+    const res = await fetch(syncConfig.endpoint, {
+      method: "PUT",
+      headers: {
+        "Authorization": "Bearer " + syncConfig.token,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(state),
+    });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    setSyncStatus("Synced.");
+  } catch (err) {
+    setSyncStatus("Push failed (" + err.message + ").");
+    toast("Push failed");
+  }
+}
+
+async function pull() {
+  if (!syncConfig) return;
+  try {
+    const res = await fetch(syncConfig.endpoint, {
+      headers: { "Authorization": "Bearer " + syncConfig.token },
+    });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const remote = await res.json();
+    if (remote && Array.isArray(remote.shortcuts)) {
+      const remoteAt = Number(remote.updatedAt) || 0;
+      if (remoteAt > state.updatedAt) {
+        remote.settings = Object.assign(defaultState().settings, remote.settings);
+        state = remote;
+        saveLocal();
+        render();
+        applySettings();
+        setSyncStatus("Synced.");
+        return;
+      }
+    }
+    // Remote is null or older — if we have anything newer, push it up.
+    if (state.updatedAt > 0) schedulePush();
+    setSyncStatus("Synced.");
+  } catch (err) {
+    setSyncStatus("Pull failed (" + err.message + ").");
+  }
+}
+
+let lastSyncStatus = "";
+
+function setSyncStatus(msg) {
+  lastSyncStatus = msg;
+  $("syncStatus").textContent = syncConfig ? msg : "Sync not configured (local-only).";
+}
+
+/* ---------- settings application ---------- */
+
+// Escape a user-supplied string before it touches CSS. Any new user string
+// that reaches CSS or HTML needs the same treatment.
+function cssUrl(u) {
+  return 'url("' + String(u).replace(/[\\"]/g, "\\$&").replace(/[\n\r]/g, "") + '")';
+}
+
+function applySettings() {
+  const s = state.settings;
+  document.documentElement.dataset.theme = s.theme === "light" ? "light" : "dark";
+  document.body.style.backgroundColor = s.bgColor || "";
+  document.body.style.backgroundImage = s.wallpaperUrl ? cssUrl(s.wallpaperUrl) : "";
+}
+
+/* ---------- rendering (DOM built with createElement — no innerHTML for user data) ---------- */
+
+function avatarColor(name) {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+  return "hsl(" + (h % 360) + ", 45%, 45%)";
+}
+
+function makeIcon(sc) {
+  const wrap = document.createElement("div");
+  wrap.className = "icon";
+  let host = "";
+  try { host = new URL(sc.url).hostname; } catch {}
+  const img = document.createElement("img");
+  img.alt = "";
+  img.loading = "lazy";
+  img.src = "https://icons.duckduckgo.com/ip3/" + host + ".ico";
+  img.onerror = () => {
+    const avatar = document.createElement("div");
+    avatar.className = "avatar";
+    avatar.style.background = avatarColor(sc.name || host || "?");
+    avatar.textContent = (sc.name || host || "?").trim().charAt(0).toUpperCase() || "?";
+    wrap.replaceChildren(avatar);
+  };
+  wrap.appendChild(img);
+  return wrap;
+}
+
+function render() {
+  const grid = $("grid");
+  grid.replaceChildren();
+  for (const sc of state.shortcuts) {
+    const tile = document.createElement("a");
+    tile.className = "tile";
+    tile.href = sc.url;
+    tile.draggable = false;
+    tile.appendChild(makeIcon(sc));
+    const label = document.createElement("div");
+    label.className = "label";
+    label.textContent = sc.name;
+    tile.appendChild(label);
+    attachLongPress(tile, sc);
+    grid.appendChild(tile);
+  }
+  $("empty").hidden = state.shortcuts.length > 0;
+}
+
+/* ---------- long-press = edit/delete (Pointer Events, 500 ms, 10 px) ---------- */
+
+function attachLongPress(tile, sc) {
+  let timer = null;
+  let startX = 0, startY = 0;
+  let longPressed = false;
+
+  tile.addEventListener("pointerdown", (e) => {
+    longPressed = false;
+    startX = e.clientX;
+    startY = e.clientY;
+    timer = setTimeout(() => {
+      longPressed = true;
+      openEditDialog(sc);
+    }, 500);
+  });
+
+  tile.addEventListener("pointermove", (e) => {
+    if (timer !== null && Math.hypot(e.clientX - startX, e.clientY - startY) > 10) {
+      clearTimeout(timer);
+      timer = null;
+    }
+  });
+
+  const cancel = () => { clearTimeout(timer); timer = null; };
+  tile.addEventListener("pointerup", cancel);
+  tile.addEventListener("pointercancel", cancel);
+  tile.addEventListener("pointerleave", cancel);
+
+  tile.addEventListener("click", (e) => {
+    if (longPressed) {
+      e.preventDefault();
+      longPressed = false;
+    }
+  });
+
+  // Touch long-press would otherwise open the native context menu.
+  tile.addEventListener("contextmenu", (e) => e.preventDefault());
+}
+
+/* ---------- add / edit dialog ---------- */
+
+let editingId = null; // null = adding
+
+function normalizeUrl(raw) {
+  const s = raw.trim();
+  if (!s) return "";
+  return /^[a-z][a-z0-9+.-]*:\/\//i.test(s) ? s : "https://" + s;
+}
+
+function openAddDialog() {
+  editingId = null;
+  $("editTitle").textContent = "Add shortcut";
+  $("editName").value = "";
+  $("editUrl").value = "";
+  $("deleteBtn").hidden = true;
+  disarmDelete();
+  $("editDialog").showModal();
+  $("editName").focus();
+}
+
+function openEditDialog(sc) {
+  editingId = sc.id;
+  $("editTitle").textContent = "Edit shortcut";
+  $("editName").value = sc.name;
+  $("editUrl").value = sc.url;
+  $("deleteBtn").hidden = false;
+  disarmDelete();
+  $("editDialog").showModal();
+}
+
+$("addBtn").addEventListener("click", openAddDialog);
+$("editCancel").addEventListener("click", () => $("editDialog").close());
+
+$("editForm").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const name = $("editName").value.trim();
+  const url = normalizeUrl($("editUrl").value);
+  if (!name || !url) return;
+  if (editingId === null) {
+    state.shortcuts.push({
+      id: "sc_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8),
+      name,
+      url,
+    });
+  } else {
+    const sc = state.shortcuts.find((s) => s.id === editingId);
+    if (sc) { sc.name = name; sc.url = url; }
+  }
+  $("editDialog").close();
+  persist();
+});
+
+/* two-tap confirm for delete — native confirm() is banned */
+
+let deleteArmed = false;
+let disarmTimer = null;
+
+function disarmDelete() {
+  deleteArmed = false;
+  clearTimeout(disarmTimer);
+  const btn = $("deleteBtn");
+  btn.textContent = "Delete";
+  btn.classList.remove("armed");
+}
+
+$("deleteBtn").addEventListener("click", () => {
+  const btn = $("deleteBtn");
+  if (!deleteArmed) {
+    deleteArmed = true;
+    btn.textContent = "Tap again to delete";
+    btn.classList.add("armed");
+    disarmTimer = setTimeout(disarmDelete, 3000);
+    return;
+  }
+  disarmDelete();
+  state.shortcuts = state.shortcuts.filter((s) => s.id !== editingId);
+  $("editDialog").close();
+  persist();
+});
+
+/* ---------- settings dialog ---------- */
+
+$("settingsBtn").addEventListener("click", () => {
+  const s = state.settings;
+  $("setTheme").value = s.theme === "light" ? "light" : "dark";
+  $("setWallpaper").value = s.wallpaperUrl || "";
+  $("setBgColor").value = s.bgColor || "";
+  $("setEndpoint").value = syncConfig ? syncConfig.endpoint : "";
+  $("setToken").value = syncConfig ? syncConfig.token : "";
+  setSyncStatus(lastSyncStatus);
+  $("settingsDialog").showModal();
+});
+
+$("settingsCancel").addEventListener("click", () => $("settingsDialog").close());
+
+$("settingsSave").addEventListener("click", () => {
+  // Sync credentials are device-local only — kept out of the synced document.
+  const endpoint = $("setEndpoint").value.trim();
+  const token = $("setToken").value.trim();
+  const hadSync = !!syncConfig;
+  if (endpoint && token) {
+    syncConfig = { endpoint, token };
+    localStorage.setItem(LS_SYNC, JSON.stringify(syncConfig));
+  } else {
+    syncConfig = null;
+    localStorage.removeItem(LS_SYNC);
+  }
+
+  const s = state.settings;
+  const theme = $("setTheme").value === "light" ? "light" : "dark";
+  const wallpaperUrl = $("setWallpaper").value.trim();
+  const bgColor = $("setBgColor").value.trim();
+  const docChanged = s.theme !== theme || s.wallpaperUrl !== wallpaperUrl || s.bgColor !== bgColor;
+  s.theme = theme;
+  s.wallpaperUrl = wallpaperUrl;
+  s.bgColor = bgColor;
+
+  $("settingsDialog").close();
+  if (docChanged) {
+    // Only a real document change may bump updatedAt — entering sync
+    // credentials alone must not make this device "newer" than the remote,
+    // or a fresh device would clobber the synced state under LWW.
+    persist();
+  } else {
+    saveLocal();
+    applySettings();
+  }
+  if (!hadSync && syncConfig) pull();
+});
+
+/* ---------- toast ---------- */
+
+let toastTimer = null;
+function toast(msg) {
+  const el = $("toast");
+  el.textContent = msg;
+  el.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove("show"), 2500);
+}
+
+/* ---------- boot ---------- */
+
+render();
+applySettings();
+setSyncStatus("");
+pull();
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") pull();
+});
+</script>
+</body>
+</html>
