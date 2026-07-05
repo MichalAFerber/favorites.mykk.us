@@ -239,6 +239,8 @@
     <input type="text" id="editName" required maxlength="60" autocomplete="off">
     <label for="editUrl">URL</label>
     <input type="text" id="editUrl" required autocomplete="off" placeholder="https://example.com" inputmode="url">
+    <label for="editIconUrl">Icon URL</label>
+    <input type="text" id="editIconUrl" autocomplete="off" placeholder="https://…/icon.png (optional — overrides the favicon)" inputmode="url">
     <div class="row">
       <button type="button" class="btn danger spacer" id="deleteBtn" hidden>Delete</button>
       <button type="button" class="btn" id="editCancel">Cancel</button>
@@ -430,7 +432,9 @@ function makeIcon(sc) {
   const img = document.createElement("img");
   img.alt = "";
   img.loading = "lazy";
-  img.src = "https://icons.duckduckgo.com/ip3/" + host + ".ico";
+  // A user-supplied iconUrl overrides the favicon service; both fall back to
+  // the letter avatar on load failure.
+  img.src = sc.iconUrl || "https://icons.duckduckgo.com/ip3/" + host + ".ico";
   img.onerror = () => {
     const avatar = document.createElement("div");
     avatar.className = "avatar";
@@ -516,6 +520,7 @@ function openAddDialog() {
   $("editTitle").textContent = "Add shortcut";
   $("editName").value = "";
   $("editUrl").value = "";
+  $("editIconUrl").value = "";
   $("deleteBtn").hidden = true;
   disarmDelete();
   $("editDialog").showModal();
@@ -527,6 +532,7 @@ function openEditDialog(sc) {
   $("editTitle").textContent = "Edit shortcut";
   $("editName").value = sc.name;
   $("editUrl").value = sc.url;
+  $("editIconUrl").value = sc.iconUrl || "";
   $("deleteBtn").hidden = false;
   disarmDelete();
   $("editDialog").showModal();
@@ -539,16 +545,25 @@ $("editForm").addEventListener("submit", (e) => {
   e.preventDefault();
   const name = $("editName").value.trim();
   const url = normalizeUrl($("editUrl").value);
+  const iconUrlRaw = $("editIconUrl").value.trim();
+  const iconUrl = iconUrlRaw ? normalizeUrl(iconUrlRaw) : "";
   if (!name || !url) return;
   if (editingId === null) {
-    state.shortcuts.push({
+    const sc = {
       id: "sc_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8),
       name,
       url,
-    });
+    };
+    if (iconUrl) sc.iconUrl = iconUrl;
+    state.shortcuts.push(sc);
   } else {
     const sc = state.shortcuts.find((s) => s.id === editingId);
-    if (sc) { sc.name = name; sc.url = url; }
+    if (sc) {
+      sc.name = name;
+      sc.url = url;
+      if (iconUrl) sc.iconUrl = iconUrl;
+      else delete sc.iconUrl;
+    }
   }
   $("editDialog").close();
   persist();

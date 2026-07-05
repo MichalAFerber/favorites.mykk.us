@@ -13,8 +13,11 @@ Run the REAL worker behind a tiny Node adapter (assets-first, like Cloudflare):
 
 1. Write a server that serves `favorites/public/` statically and routes
    everything else to `worker.fetch(request, env)` with
-   `env = { SYNC_TOKEN: 'test-token-123', SHORTCUTS_KV: <Map-backed {get,put}> }`.
-   Node 22 has Request/Response natively; `import worker from '.../worker.js'` works as ESM.
+   `env = { SHORTCUTS_KV: <Map-backed {get,put,delete}> }`.
+   Auth is per-user token mappings in KV — seed them like:
+   `kv.set('token:' + sha256hex('test-token-123'), 'alice')` (use node:crypto).
+   State lives at `state:<userId>`. Node 22 has Request/Response natively;
+   `import worker from '.../worker.js'` works as ESM.
 2. Listen on 8787. Restart the server between runs — KV is in-memory.
 
 ## Driving
@@ -42,4 +45,6 @@ long-press → edit dialog; two-tap delete (first tap arms, second deletes);
 settings theme/bgColor; configure sync on device A → push; fresh device B
 configure sync → pulls (must NOT clobber remote with its empty doc); bad token
 → "Pull failed" status + page still usable locally; wallpaper URL with `"` and
-`)` stays inside one escaped `url("…")`.
+`)` stays inside one escaped `url("…")`; two different users' tokens read and
+write different `state:<userId>` docs (no cross-user bleed); custom `iconUrl`
+on a shortcut is used as the img src instead of DuckDuckGo.

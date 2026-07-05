@@ -10,22 +10,21 @@ function jsonResponse(status, obj) {
   return new Response(JSON.stringify(obj), { status, headers: JSON_HEADERS });
 }
 
-// Constant-time comparison so token checks don't leak length/prefix timing.
-function tokensEqual(a, b) {
-  const enc = new TextEncoder();
-  const ab = enc.encode(a);
-  const bb = enc.encode(b);
-  if (ab.length !== bb.length) return false;
-  let diff = 0;
-  for (let i = 0; i < ab.length; i++) diff |= ab[i] ^ bb[i];
-  return diff === 0;
+async function sha256Hex(s) {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
+  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-function authorized(request, env) {
-  if (!env.SYNC_TOKEN) return false;
+// Tokens are stored hashed in KV: `token:<sha256(token)>` → userId.
+// Issue and revoke them with favorites/issue-token.sh. Comparing by hash
+// lookup avoids storing plaintext tokens server-side and doesn't leak
+// timing about partial matches.
+async function authenticate(request, env) {
   const header = request.headers.get("Authorization") || "";
-  if (!header.startsWith("Bearer ")) return false;
-  return tokensEqual(header.slice(7).trim(), env.SYNC_TOKEN);
+  if (!header.startsWith("Bearer ")) return null;
+  const token = header.slice(7).trim();
+  if (!token) return null;
+  return env.SHORTCUTS_KV.get("token:" + (await sha256Hex(token)));
 }
 
 export default {
@@ -36,12 +35,14 @@ export default {
       return jsonResponse(404, { error: "not found" });
     }
 
-    if (!authorized(request, env)) {
+    const userId = await authenticate(request, env);
+    if (!userId) {
       return jsonResponse(401, { error: "unauthorized" });
     }
+    const stateKey = "state:" + userId;
 
     if (request.method === "GET") {
-      const state = await env.SHORTCUTS_KV.get("state");
+      const state = await env.SHORTCUTS_KV.get(stateKey);
       // Literal `null` if never synced — clients rely on this.
       return new Response(state ?? "null", { status: 200, headers: JSON_HEADERS });
     }
@@ -60,7 +61,7 @@ export default {
       } catch {
         return jsonResponse(400, { error: "bad json" });
       }
-      await env.SHORTCUTS_KV.put("state", body);
+      await env.SHORTCUTS_KV.put(stateKey, body);
       return jsonResponse(200, { ok: true });
     }
 
