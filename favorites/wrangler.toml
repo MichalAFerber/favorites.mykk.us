@@ -16,4 +16,5 @@ id = "71257de3aef04824ad72e7597d0ed8ac"
 pattern = "favorites.mykk.us"
 custom_domain = true
 
-# SYNC_TOKEN is a Worker secret: `wrangler secret put SYNC_TOKEN`
+# Per-user tokens live in KV (token:<sha256> → userId) — see issue-token.sh.
+# The legacy SYNC_TOKEN Worker secret is no longer read by the code.
