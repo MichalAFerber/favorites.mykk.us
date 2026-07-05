@@ -87,6 +87,10 @@ All user management is `favorites/issue-token.sh`, run by the owner from the `fa
 
 - **Inspecting** — `wrangler kv key list --namespace-id <id>` shows every user and token hash; `wrangler kv key get "state:<userId>" --namespace-id <id>` shows a user's document; `wrangler tail favorites` streams live request logs.
 
+## Credits
+
+Favicon: [Favorites](https://img.icons8.com/stickers/100/favorites.png) icon by [Icons8](https://icons8.com).
+
 ## License
 
 [MIT](LICENSE)
