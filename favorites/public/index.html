@@ -264,10 +264,8 @@
   <input type="text" id="setBgColor" autocomplete="off" placeholder="#111418 (optional)">
 
   <h3>Sync</h3>
-  <p class="hint">Stored only on this device — never included in synced data. Leave blank for local-only mode.</p>
-  <label for="setEndpoint">Endpoint</label>
-  <input type="text" id="setEndpoint" autocomplete="off" placeholder="https://favorites.mykk.us/api/state">
-  <label for="setToken">Token</label>
+  <p class="hint">Your token is your identity — stored only on this device, never included in synced data. Leave blank for local-only mode.</p>
+  <label for="setToken">Sync token</label>
   <input type="password" id="setToken" autocomplete="off">
   <p class="hint" id="syncStatus"></p>
 
@@ -285,7 +283,10 @@
 /* ---------- constants & storage ---------- */
 
 const LS_STATE = "favorites:state"; // synced document (shortcuts + settings)
-const LS_SYNC  = "favorites:sync";  // device-local: { endpoint, token } — never synced
+const LS_SYNC  = "favorites:sync";  // device-local: { token } — never synced
+
+// The API is always served by the same Worker as this page.
+const API_URL = location.origin + "/api/state";
 
 const $ = (id) => document.getElementById(id);
 
@@ -313,8 +314,9 @@ function loadState() {
 
 function loadSyncConfig() {
   try {
+    // Older configs also stored an endpoint — only the token matters now.
     const cfg = JSON.parse(localStorage.getItem(LS_SYNC) || "null");
-    return cfg && cfg.endpoint && cfg.token ? cfg : null;
+    return cfg && cfg.token ? { token: cfg.token } : null;
   } catch {
     return null;
   }
@@ -350,7 +352,7 @@ function schedulePush() {
 async function push() {
   if (!syncConfig) return;
   try {
-    const res = await fetch(syncConfig.endpoint, {
+    const res = await fetch(API_URL, {
       method: "PUT",
       headers: {
         "Authorization": "Bearer " + syncConfig.token,
@@ -369,7 +371,7 @@ async function push() {
 async function pull() {
   if (!syncConfig) return;
   try {
-    const res = await fetch(syncConfig.endpoint, {
+    const res = await fetch(API_URL, {
       headers: { "Authorization": "Bearer " + syncConfig.token },
     });
     if (!res.ok) throw new Error("HTTP " + res.status);
@@ -604,7 +606,6 @@ $("settingsBtn").addEventListener("click", () => {
   $("setTheme").value = s.theme === "light" ? "light" : "dark";
   $("setWallpaper").value = s.wallpaperUrl || "";
   $("setBgColor").value = s.bgColor || "";
-  $("setEndpoint").value = syncConfig ? syncConfig.endpoint : "";
   $("setToken").value = syncConfig ? syncConfig.token : "";
   setSyncStatus(lastSyncStatus);
   $("settingsDialog").showModal();
@@ -613,12 +614,11 @@ $("settingsBtn").addEventListener("click", () => {
 $("settingsCancel").addEventListener("click", () => $("settingsDialog").close());
 
 $("settingsSave").addEventListener("click", () => {
-  // Sync credentials are device-local only — kept out of the synced document.
-  const endpoint = $("setEndpoint").value.trim();
+  // The sync token is device-local only — kept out of the synced document.
   const token = $("setToken").value.trim();
   const hadSync = !!syncConfig;
-  if (endpoint && token) {
-    syncConfig = { endpoint, token };
+  if (token) {
+    syncConfig = { token };
     localStorage.setItem(LS_SYNC, JSON.stringify(syncConfig));
   } else {
     syncConfig = null;
