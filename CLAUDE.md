@@ -66,9 +66,10 @@ Conflict model is last-write-wins on `updatedAt`, whole document, per user.
 This is deliberate — users never share a document, so do not introduce
 merging, CRDTs, or per-item versioning.
 
-Sync credentials (endpoint + token) live only in device-local storage on the
-client and are intentionally excluded from the synced document. Keep that
-separation.
+The sync token lives only in device-local storage on the client and is
+intentionally excluded from the synced document. Keep that separation. The
+client always talks to its own origin (`location.origin + "/api/state"`) —
+there is no endpoint setting.
 
 ## Deploy
 

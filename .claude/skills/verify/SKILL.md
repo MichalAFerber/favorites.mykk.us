@@ -27,6 +27,8 @@ Run the REAL worker behind a tiny Node adapter (assets-first, like Cloudflare):
   (the version-suffixed dir; `/opt/pw-browsers/chromium/` does not exist).
 - Fresh browser contexts = separate "devices" (isolated localStorage) — use
   two contexts to exercise sync/LWW.
+- Configure sync = fill `#setToken` only; the client always syncs against its
+  own origin, which is the harness itself. There is no endpoint field.
 - Long-press: `mouse.move` to tile center, `mouse.down()`, wait 650 ms, `mouse.up()`.
 - Sync push is debounced 800 ms — wait ≥1.2 s before asserting on remote state.
 
