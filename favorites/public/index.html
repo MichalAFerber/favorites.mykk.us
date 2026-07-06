@@ -89,6 +89,8 @@
     font-size: 13px;
     text-decoration: none;
     backdrop-filter: blur(6px);
+    /* Display-only: page names stay lowercase in the document and URLs. */
+    text-transform: capitalize;
   }
   .page-chip:hover { background: var(--tile-bg-hover); }
   .page-chip.current {
@@ -361,7 +363,10 @@ const currentPage = normalizePage(new URLSearchParams(location.search).get("p"))
 const pageOf = (sc) => normalizePage(sc.page);
 const pageHref = (page) => (page ? "?p=" + encodeURIComponent(page) : location.pathname);
 
-if (currentPage) document.title = "Favorites — " + currentPage;
+// Title-case for display only — stored page names and URLs stay lowercase.
+const titleCase = (s) => s.replace(/\S+/g, (w) => w.charAt(0).toUpperCase() + w.slice(1));
+
+if (currentPage) document.title = "Favorites — " + titleCase(currentPage);
 
 /* ---------- persistence: every mutation funnels through persist() ---------- */
 
