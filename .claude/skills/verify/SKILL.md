@@ -54,4 +54,13 @@ write different `state:<userId>` docs (no cross-user bleed); custom `iconUrl`
 on a shortcut is used as the img src instead of DuckDuckGo; `?p=homelab` shows
 only that page's shortcuts (page names lowercase-normalized, pageless = main
 page), add-dialog prefills the current page, chip nav appears once named pages
-exist, and pages survive a sync round-trip.
+exist, and pages survive a sync round-trip; device default page applies to
+bare URLs only (explicit `?p=` wins, Home chip = `?p=`), stays out of the
+synced doc; sort toggle per page (manual = stored order, drag via long-press
+lift then move — drag test: mouse.down, wait 650 ms, mouse.move with steps,
+mouse.up; expect reorder committed to the stored array); Settings import
+merges bookmarks HTML/JSON deduped on (url, page); export downloads state
+JSON (Playwright `download` + `filechooser` events work for both).
+
+Drag gotcha: goto(BASE) is NOT the main page once a test sets a device
+default page — use `?p=` to pin the main page explicitly.

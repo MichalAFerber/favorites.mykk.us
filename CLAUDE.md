@@ -54,10 +54,14 @@ State document shape (per user):
 ```json
 {
   "shortcuts": [{ "id": "sc_...", "name": "GitHub", "url": "https://github.com", "iconUrl": "https://…/icon.png", "page": "homelab" }],
-  "settings": { "theme": "dark", "wallpaperUrl": "", "bgColor": "" },
+  "settings": { "theme": "dark", "wallpaperUrl": "", "bgColor": "", "pageSort": { "homelab": "manual" } },
   "updatedAt": 1751600000000
 }
 ```
+
+`settings.pageSort` maps a page name to `"manual"`; pages absent from it
+render alphabetically. In manual mode the stored array order (per page) is
+the source of truth and drag-reordering rewrites it.
 
 `iconUrl` is optional — when present it overrides the favicon service for
 that shortcut. `page` is optional — it assigns the shortcut to a named page
@@ -134,9 +138,24 @@ users is fine; watch this before inviting more.
 - Multiple pages: `?p=homelab` filters the grid to that page's shortcuts; no
   param = main page. Filtering is display-only — pages live inside the one
   synced document, and page names are normalized to lowercase.
+- Device-local storage holds exactly three things, none of them synced: the
+  sync token, the default page (which page a bare URL opens; explicit `?p=`
+  always wins, and the Home chip links to `?p=` as the escape hatch), and
+  nothing else. Keep it that way.
+- Sort is per page: alphabetical by default, `"manual"` via the header
+  toggle. Manual mode = long-press lifts a tile, drag reorders, release
+  without movement opens the edit dialog. Drag listeners go on `document`
+  while lifted — moving the tile in the DOM releases pointer capture, so
+  capture cannot be used.
+- Settings → Data: Export downloads the state JSON; Import merges (never
+  replaces) a favorites JSON or a Netscape bookmarks HTML (folders become
+  pages, non-http(s) schemes skipped), deduped on (url, page), and aborts
+  if the merged doc would exceed the 100 KB cap.
 - Long-press = edit/delete. Pointer Events, 500 ms threshold, 10 px move
   tolerance. Native `confirm()` is banned (breaks in sandboxed iframes);
-  destructive actions use two-tap confirm.
+  destructive actions use two-tap confirm. The `contextmenu` handler must
+  never cancel the long-press timer for touch — Android fires contextmenu
+  at ~500 ms and would race it.
 - Wallpaper URL is escaped via `cssUrl()` before hitting `background-image`.
   Any new user-supplied string that touches CSS or HTML gets the same
   treatment.
