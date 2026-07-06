@@ -74,6 +74,29 @@
     padding: 32px 16px 64px;
   }
 
+  #pages {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  .page-chip {
+    display: inline-block;
+    padding: 6px 14px;
+    border-radius: 999px;
+    background: var(--tile-bg);
+    color: var(--fg);
+    font-size: 13px;
+    text-decoration: none;
+    backdrop-filter: blur(6px);
+  }
+  .page-chip:hover { background: var(--tile-bg-hover); }
+  .page-chip.current {
+    background: var(--accent);
+    color: var(--bg);
+    font-weight: 600;
+  }
+
   #grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
@@ -229,8 +252,9 @@
 </header>
 
 <main>
+  <nav id="pages" hidden aria-label="Pages"></nav>
   <div id="grid"></div>
-  <div id="empty" hidden>No shortcuts yet — tap + to add one.<br><span class="hint">Long-press a tile to edit or delete it.</span></div>
+  <div id="empty" hidden><span id="emptyMsg">No shortcuts yet — tap + to add one.</span><br><span class="hint">Long-press a tile to edit or delete it.</span></div>
 </main>
 
 <dialog id="editDialog">
@@ -242,6 +266,8 @@
     <input type="text" id="editUrl" required autocomplete="off" placeholder="https://example.com" inputmode="url">
     <label for="editIconUrl">Icon URL</label>
     <input type="text" id="editIconUrl" autocomplete="off" placeholder="https://…/icon.png (optional — overrides the favicon)" inputmode="url">
+    <label for="editPage">Page</label>
+    <input type="text" id="editPage" autocomplete="off" maxlength="40" placeholder="e.g. homelab (blank = main page)">
     <div class="row">
       <button type="button" class="btn danger spacer" id="deleteBtn" hidden>Delete</button>
       <button type="button" class="btn" id="editCancel">Cancel</button>
@@ -325,6 +351,17 @@ function loadSyncConfig() {
 
 let state = loadState();
 let syncConfig = loadSyncConfig();
+
+/* ---------- pages (?p=homelab) ---------- */
+
+// Page names are normalized to lowercase so ?p=Homelab and a shortcut saved
+// as "homelab" always match. "" is the main page.
+const normalizePage = (s) => String(s || "").trim().toLowerCase();
+const currentPage = normalizePage(new URLSearchParams(location.search).get("p"));
+const pageOf = (sc) => normalizePage(sc.page);
+const pageHref = (page) => (page ? "?p=" + encodeURIComponent(page) : location.pathname);
+
+if (currentPage) document.title = "Favorites — " + currentPage;
 
 /* ---------- persistence: every mutation funnels through persist() ---------- */
 
@@ -449,15 +486,39 @@ function makeIcon(sc) {
   return wrap;
 }
 
+function renderPages() {
+  const nav = $("pages");
+  const pages = [...new Set(state.shortcuts.map(pageOf))].filter(Boolean).sort();
+  // Show the switcher once named pages exist, or when parked on an unknown
+  // page (so there's always a way back to the main page).
+  if (pages.length === 0 && !currentPage) {
+    nav.hidden = true;
+    nav.replaceChildren();
+    return;
+  }
+  nav.hidden = false;
+  const chips = [];
+  for (const page of ["", ...pages]) {
+    const chip = document.createElement("a");
+    chip.className = "page-chip" + (page === currentPage ? " current" : "");
+    chip.href = pageHref(page);
+    chip.textContent = page || "Home";
+    chips.push(chip);
+  }
+  nav.replaceChildren(...chips);
+}
+
 function render() {
   const grid = $("grid");
   grid.replaceChildren();
-  // Display order only — the stored array is left untouched so sorting never
-  // counts as a document edit for sync purposes.
-  const sorted = [...state.shortcuts].sort((a, b) =>
-    (a.name || "").localeCompare(b.name || "", undefined, { sensitivity: "base", numeric: true })
-  );
-  for (const sc of sorted) {
+  // Display order only — the stored array is left untouched so filtering and
+  // sorting never count as a document edit for sync purposes.
+  const visible = state.shortcuts
+    .filter((sc) => pageOf(sc) === currentPage)
+    .sort((a, b) =>
+      (a.name || "").localeCompare(b.name || "", undefined, { sensitivity: "base", numeric: true })
+    );
+  for (const sc of visible) {
     const tile = document.createElement("a");
     tile.className = "tile";
     tile.href = sc.url;
@@ -470,7 +531,11 @@ function render() {
     attachLongPress(tile, sc);
     grid.appendChild(tile);
   }
-  $("empty").hidden = state.shortcuts.length > 0;
+  renderPages();
+  $("emptyMsg").textContent = state.shortcuts.length > 0
+    ? "No shortcuts on this page yet — tap + to add one."
+    : "No shortcuts yet — tap + to add one.";
+  $("empty").hidden = visible.length > 0;
 }
 
 /* ---------- long-press = edit/delete (Pointer Events, 500 ms, 10 px) ---------- */
@@ -529,6 +594,7 @@ function openAddDialog() {
   $("editName").value = "";
   $("editUrl").value = "";
   $("editIconUrl").value = "";
+  $("editPage").value = currentPage;
   $("deleteBtn").hidden = true;
   disarmDelete();
   $("editDialog").showModal();
@@ -541,6 +607,7 @@ function openEditDialog(sc) {
   $("editName").value = sc.name;
   $("editUrl").value = sc.url;
   $("editIconUrl").value = sc.iconUrl || "";
+  $("editPage").value = sc.page || "";
   $("deleteBtn").hidden = false;
   disarmDelete();
   $("editDialog").showModal();
@@ -555,6 +622,7 @@ $("editForm").addEventListener("submit", (e) => {
   const url = normalizeUrl($("editUrl").value);
   const iconUrlRaw = $("editIconUrl").value.trim();
   const iconUrl = iconUrlRaw ? normalizeUrl(iconUrlRaw) : "";
+  const page = normalizePage($("editPage").value);
   if (!name || !url) return;
   if (editingId === null) {
     const sc = {
@@ -563,6 +631,7 @@ $("editForm").addEventListener("submit", (e) => {
       url,
     };
     if (iconUrl) sc.iconUrl = iconUrl;
+    if (page) sc.page = page;
     state.shortcuts.push(sc);
   } else {
     const sc = state.shortcuts.find((s) => s.id === editingId);
@@ -571,6 +640,8 @@ $("editForm").addEventListener("submit", (e) => {
       sc.url = url;
       if (iconUrl) sc.iconUrl = iconUrl;
       else delete sc.iconUrl;
+      if (page) sc.page = page;
+      else delete sc.page;
     }
   }
   $("editDialog").close();
