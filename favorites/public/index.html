@@ -549,8 +549,13 @@ function attachLongPress(tile, sc) {
   let timer = null;
   let startX = 0, startY = 0;
   let longPressed = false;
+  let pointerType = "";
 
   tile.addEventListener("pointerdown", (e) => {
+    pointerType = e.pointerType;
+    // Only the primary button starts the long-press timer — a held
+    // right-click must not pop the edit dialog behind the context menu.
+    if (e.button !== 0) return;
     longPressed = false;
     startX = e.clientX;
     startY = e.clientY;
@@ -579,8 +584,13 @@ function attachLongPress(tile, sc) {
     }
   });
 
-  // Touch long-press would otherwise open the native context menu.
-  tile.addEventListener("contextmenu", (e) => e.preventDefault());
+  // Touch/pen long-press would otherwise open the native context menu on
+  // top of our edit dialog — suppress it there. Mouse right-click keeps the
+  // browser menu (Open link in new window / new tab / etc.).
+  tile.addEventListener("contextmenu", (e) => {
+    cancel();
+    if (pointerType !== "mouse") e.preventDefault();
+  });
 }
 
 /* ---------- add / edit dialog ---------- */
