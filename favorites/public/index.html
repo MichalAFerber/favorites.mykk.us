@@ -67,6 +67,7 @@
     backdrop-filter: blur(6px);
   }
   .icon-btn:hover { background: var(--tile-bg-hover); }
+  .icon-btn.active { background: var(--accent); color: var(--bg); }
 
   main {
     max-width: 820px;
@@ -122,6 +123,13 @@
     touch-action: manipulation;
   }
   .tile:hover { background: var(--tile-bg-hover); }
+  .tile.lifted {
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.4);
+    opacity: 0.92;
+    z-index: 5;
+    position: relative;
+    pointer-events: none; /* so elementFromPoint sees the tile underneath */
+  }
 
   .tile .icon {
     width: 44px;
@@ -212,6 +220,7 @@
     justify-content: flex-end;
     margin-top: 20px;
   }
+  .row.start { justify-content: flex-start; margin-top: 12px; }
   .row .spacer { margin-right: auto; }
 
   button.btn {
@@ -249,6 +258,7 @@
 <body>
 
 <header>
+  <button class="icon-btn" id="sortBtn" aria-label="Toggle sort order">&#8645;</button>
   <button class="icon-btn" id="addBtn" title="Add shortcut" aria-label="Add shortcut">+</button>
   <button class="icon-btn" id="settingsBtn" title="Settings" aria-label="Settings">&#9881;</button>
 </header>
@@ -292,11 +302,24 @@
   <label for="setBgColor">Background color</label>
   <input type="text" id="setBgColor" autocomplete="off" placeholder="#111418 (optional)">
 
+  <h3>This device</h3>
+  <label for="setDefaultPage">Default page</label>
+  <input type="text" id="setDefaultPage" autocomplete="off" maxlength="40" placeholder="e.g. mobile (blank = main page)">
+  <p class="hint">Stored only on this device — the page shown when you open the site without ?p= in the URL.</p>
+
   <h3>Sync</h3>
   <p class="hint">Your token is your identity — stored only on this device, never included in synced data. Leave blank for local-only mode.</p>
   <label for="setToken">Sync token</label>
   <input type="password" id="setToken" autocomplete="off">
   <p class="hint" id="syncStatus"></p>
+
+  <h3>Data</h3>
+  <div class="row start">
+    <button type="button" class="btn" id="importBtn">Import&#8230;</button>
+    <button type="button" class="btn" id="exportBtn">Export</button>
+    <input type="file" id="importFile" accept=".json,.html,.htm,application/json,text/html" hidden>
+  </div>
+  <p class="hint">Import a favorites export (JSON) or a browser bookmarks file (HTML) — bookmark folders become pages. Imports merge with what's here; nothing is replaced.</p>
 
   <div class="row">
     <button type="button" class="btn" id="settingsCancel">Cancel</button>
@@ -313,6 +336,7 @@
 
 const LS_STATE = "favorites:state"; // synced document (shortcuts + settings)
 const LS_SYNC  = "favorites:sync";  // device-local: { token } — never synced
+const LS_DEFAULT_PAGE = "favorites:defaultPage"; // device-local — never synced
 
 // The API is always served by the same Worker as this page.
 const API_URL = location.origin + "/api/state";
@@ -322,7 +346,8 @@ const $ = (id) => document.getElementById(id);
 function defaultState() {
   return {
     shortcuts: [],
-    settings: { theme: "dark", wallpaperUrl: "", bgColor: "" },
+    // pageSort maps a page name to "manual"; absent = alphabetical.
+    settings: { theme: "dark", wallpaperUrl: "", bgColor: "", pageSort: {} },
     updatedAt: 0,
   };
 }
@@ -334,6 +359,7 @@ function loadState() {
     const doc = JSON.parse(raw);
     if (!doc || !Array.isArray(doc.shortcuts)) return defaultState();
     doc.settings = Object.assign(defaultState().settings, doc.settings);
+    if (typeof doc.settings.pageSort !== "object" || doc.settings.pageSort === null) doc.settings.pageSort = {};
     doc.updatedAt = Number(doc.updatedAt) || 0;
     return doc;
   } catch {
@@ -359,9 +385,21 @@ let syncConfig = loadSyncConfig();
 // Page names are normalized to lowercase so ?p=Homelab and a shortcut saved
 // as "homelab" always match. "" is the main page.
 const normalizePage = (s) => String(s || "").trim().toLowerCase();
-const currentPage = normalizePage(new URLSearchParams(location.search).get("p"));
+// An explicit ?p= in the URL (even empty) always wins; without one, this
+// device's default page (device-local, like the sync token) applies.
+let deviceDefaultPage = normalizePage(localStorage.getItem(LS_DEFAULT_PAGE) || "");
+const urlHasPage = new URLSearchParams(location.search).has("p");
+const currentPage = urlHasPage
+  ? normalizePage(new URLSearchParams(location.search).get("p"))
+  : deviceDefaultPage;
 const pageOf = (sc) => normalizePage(sc.page);
-const pageHref = (page) => (page ? "?p=" + encodeURIComponent(page) : location.pathname);
+// When a device default is set, the main page needs an explicit ?p= (empty)
+// or the Home chip would just bounce back to the default page.
+const pageHref = (page) =>
+  page ? "?p=" + encodeURIComponent(page) : (deviceDefaultPage ? "?p=" : location.pathname);
+
+const sortModeFor = (page) =>
+  (state.settings.pageSort || {})[page] === "manual" ? "manual" : "alpha";
 
 // Title-case for display only — stored page names and URLs stay lowercase.
 const titleCase = (s) => s.replace(/\S+/g, (w) => w.charAt(0).toUpperCase() + w.slice(1));
@@ -516,18 +554,21 @@ function renderPages() {
 function render() {
   const grid = $("grid");
   grid.replaceChildren();
-  // Display order only — the stored array is left untouched so filtering and
-  // sorting never count as a document edit for sync purposes.
-  const visible = state.shortcuts
-    .filter((sc) => pageOf(sc) === currentPage)
-    .sort((a, b) =>
+  const manual = sortModeFor(currentPage) === "manual";
+  // In alphabetical mode the sort is display-only; in manual mode the stored
+  // array order (per page) is the source of truth and dragging rewrites it.
+  const visible = state.shortcuts.filter((sc) => pageOf(sc) === currentPage);
+  if (!manual) {
+    visible.sort((a, b) =>
       (a.name || "").localeCompare(b.name || "", undefined, { sensitivity: "base", numeric: true })
     );
+  }
   for (const sc of visible) {
     const tile = document.createElement("a");
     tile.className = "tile";
     tile.href = sc.url;
     tile.draggable = false;
+    tile.dataset.id = sc.id;
     tile.appendChild(makeIcon(sc));
     const label = document.createElement("div");
     label.className = "label";
@@ -536,6 +577,11 @@ function render() {
     attachLongPress(tile, sc);
     grid.appendChild(tile);
   }
+  const sortBtn = $("sortBtn");
+  sortBtn.classList.toggle("active", manual);
+  sortBtn.title = manual
+    ? "Sort: Manual (long-press and drag to arrange) — click for A→Z"
+    : "Sort: A→Z — click for manual ordering";
   renderPages();
   $("emptyMsg").textContent = state.shortcuts.length > 0
     ? "No shortcuts on this page yet — tap + to add one."
@@ -543,13 +589,81 @@ function render() {
   $("empty").hidden = visible.length > 0;
 }
 
-/* ---------- long-press = edit/delete (Pointer Events, 500 ms, 10 px) ---------- */
+/* ---------- long-press = edit/delete (Pointer Events, 500 ms, 10 px) ----------
+   In manual-sort mode the long-press instead lifts the tile: dragging it
+   reorders the page, releasing without movement opens the edit dialog. */
+
+// Rewrite the stored array so this page's shortcuts match the grid's DOM
+// order. Other pages' relative order is untouched.
+function commitGridOrder() {
+  const ids = [...$("grid").children].map((el) => el.dataset.id);
+  const onPage = new Map(
+    state.shortcuts.filter((sc) => pageOf(sc) === currentPage).map((sc) => [sc.id, sc])
+  );
+  const others = state.shortcuts.filter((sc) => pageOf(sc) !== currentPage);
+  state.shortcuts = others.concat(ids.map((id) => onPage.get(id)).filter(Boolean));
+  persist();
+}
 
 function attachLongPress(tile, sc) {
   let timer = null;
   let startX = 0, startY = 0;
   let longPressed = false;
   let pointerType = "";
+  let lifted = false, dragging = false;
+  let grabX = 0, grabY = 0;
+
+  const positionGhost = (e) => {
+    // Measure the tile's untransformed layout position, then offset it so the
+    // grab point stays under the pointer.
+    tile.style.transform = "";
+    const r = tile.getBoundingClientRect();
+    tile.style.transform =
+      "translate(" + (e.clientX - grabX - r.x) + "px, " + (e.clientY - grabY - r.y) + "px) scale(1.05)";
+  };
+
+  // Drag listeners live on the document while the tile is lifted: moving the
+  // tile in the DOM would release pointer capture, so capture can't be used.
+  const onDragMove = (e) => {
+    if (!dragging && Math.hypot(e.clientX - startX, e.clientY - startY) > 10) dragging = true;
+    if (!dragging) return;
+    // The lifted tile has pointer-events: none, so this finds the tile under it.
+    const el = document.elementFromPoint(e.clientX, e.clientY);
+    const over = el && el.closest(".tile");
+    if (over && over !== tile) {
+      const r = over.getBoundingClientRect();
+      const before = e.clientY < r.y + r.height / 2 ||
+        (e.clientY < r.y + r.height && e.clientX < r.x + r.width / 2);
+      over.parentNode.insertBefore(tile, before ? over : over.nextSibling);
+    }
+    positionGhost(e);
+  };
+
+  const blockScroll = (e) => e.preventDefault();
+
+  const endDrag = () => {
+    document.removeEventListener("pointermove", onDragMove);
+    document.removeEventListener("pointerup", onDragEnd);
+    document.removeEventListener("pointercancel", onDragCancel);
+    document.removeEventListener("touchmove", blockScroll);
+    tile.classList.remove("lifted");
+    tile.style.transform = "";
+    lifted = false;
+  };
+
+  const onDragEnd = () => {
+    const moved = dragging;
+    dragging = false;
+    endDrag();
+    if (moved) commitGridOrder();
+    else openEditDialog(sc);
+  };
+
+  const onDragCancel = () => {
+    dragging = false;
+    endDrag();
+    render(); // restore the committed order
+  };
 
   tile.addEventListener("pointerdown", (e) => {
     pointerType = e.pointerType;
@@ -557,15 +671,31 @@ function attachLongPress(tile, sc) {
     // right-click must not pop the edit dialog behind the context menu.
     if (e.button !== 0) return;
     longPressed = false;
+    lifted = false;
+    dragging = false;
     startX = e.clientX;
     startY = e.clientY;
     timer = setTimeout(() => {
       longPressed = true;
-      openEditDialog(sc);
+      if (sortModeFor(currentPage) === "manual") {
+        lifted = true;
+        const r = tile.getBoundingClientRect();
+        grabX = startX - r.x;
+        grabY = startY - r.y;
+        tile.classList.add("lifted");
+        document.addEventListener("pointermove", onDragMove);
+        document.addEventListener("pointerup", onDragEnd);
+        document.addEventListener("pointercancel", onDragCancel);
+        // The drag owns the touch gesture — stop the page scrolling.
+        document.addEventListener("touchmove", blockScroll, { passive: false });
+      } else {
+        openEditDialog(sc);
+      }
     }, 500);
   });
 
   tile.addEventListener("pointermove", (e) => {
+    if (lifted) return; // document handles the drag
     if (timer !== null && Math.hypot(e.clientX - startX, e.clientY - startY) > 10) {
       clearTimeout(timer);
       timer = null;
@@ -574,8 +704,8 @@ function attachLongPress(tile, sc) {
 
   const cancel = () => { clearTimeout(timer); timer = null; };
   tile.addEventListener("pointerup", cancel);
-  tile.addEventListener("pointercancel", cancel);
-  tile.addEventListener("pointerleave", cancel);
+  tile.addEventListener("pointercancel", () => { cancel(); if (lifted) onDragCancel(); });
+  tile.addEventListener("pointerleave", () => { if (!lifted) cancel(); });
 
   tile.addEventListener("click", (e) => {
     if (longPressed) {
@@ -585,11 +715,12 @@ function attachLongPress(tile, sc) {
   });
 
   // Touch/pen long-press would otherwise open the native context menu on
-  // top of our edit dialog — suppress it there. Mouse right-click keeps the
-  // browser menu (Open link in new window / new tab / etc.).
+  // top of our edit dialog — suppress it there (without touching the timer:
+  // Android fires contextmenu at ~500 ms, racing the long-press). Mouse
+  // right-click keeps the browser menu (Open link in new window / new tab).
   tile.addEventListener("contextmenu", (e) => {
-    cancel();
-    if (pointerType !== "mouse") e.preventDefault();
+    if (pointerType === "mouse") cancel();
+    else e.preventDefault();
   });
 }
 
@@ -698,6 +829,7 @@ $("settingsBtn").addEventListener("click", () => {
   $("setTheme").value = s.theme === "light" ? "light" : "dark";
   $("setWallpaper").value = s.wallpaperUrl || "";
   $("setBgColor").value = s.bgColor || "";
+  $("setDefaultPage").value = deviceDefaultPage;
   $("setToken").value = syncConfig ? syncConfig.token : "";
   setSyncStatus(lastSyncStatus);
   $("settingsDialog").showModal();
@@ -716,6 +848,13 @@ $("settingsSave").addEventListener("click", () => {
     syncConfig = null;
     localStorage.removeItem(LS_SYNC);
   }
+
+  // Default page is device-local too — it never touches the synced document.
+  const newDefaultPage = normalizePage($("setDefaultPage").value);
+  const defaultPageChanged = newDefaultPage !== deviceDefaultPage;
+  deviceDefaultPage = newDefaultPage;
+  if (newDefaultPage) localStorage.setItem(LS_DEFAULT_PAGE, newDefaultPage);
+  else localStorage.removeItem(LS_DEFAULT_PAGE);
 
   const s = state.settings;
   const theme = $("setTheme").value === "light" ? "light" : "dark";
@@ -737,6 +876,124 @@ $("settingsSave").addEventListener("click", () => {
     applySettings();
   }
   if (!hadSync && syncConfig) pull();
+  // currentPage is resolved at load, so a new default needs a reload — but
+  // only when the URL isn't already pinning a page via ?p=.
+  if (defaultPageChanged && !urlHasPage) location.reload();
+});
+
+/* ---------- sort toggle (per page, synced) ---------- */
+
+$("sortBtn").addEventListener("click", () => {
+  const ps = state.settings.pageSort || (state.settings.pageSort = {});
+  if (sortModeFor(currentPage) === "manual") delete ps[currentPage];
+  else ps[currentPage] = "manual";
+  persist();
+  toast(sortModeFor(currentPage) === "manual"
+    ? "Manual order — long-press a tile, then drag"
+    : "Sorted A→Z");
+});
+
+/* ---------- import / export ---------- */
+
+const newShortcutId = () =>
+  "sc_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+
+// Netscape bookmarks HTML → [{name, url, page}] with folders as pages.
+// Pure string tokenizing — nothing from the file ever touches the DOM here.
+function parseBookmarksHtml(text) {
+  const decode = (s) => s
+    .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'").replace(/&amp;/g, "&");
+  // Browser root folders aren't meaningful pages.
+  const ROOTS = new Set(["bookmarks bar", "bookmarks toolbar", "other bookmarks", "bookmarks menu", "mobile bookmarks", "bookmarks"]);
+  const tokens = text.matchAll(/<H3[^>]*>([^<]*)<\/H3>|<A\s+HREF="([^"]*)"[^>]*>([^<]*)<\/A>|<\/DL>/gi);
+  const stack = [];
+  const out = [];
+  for (const t of tokens) {
+    const [full, h3, href, aText] = t;
+    if (full.toUpperCase().startsWith("<H3")) {
+      stack.push(normalizePage(decode(h3)));
+    } else if (href !== undefined) {
+      if (!/^https?:\/\//i.test(href)) continue;
+      const folders = stack.filter((f) => f && !ROOTS.has(f));
+      out.push({
+        name: decode(aText).trim() || decode(href),
+        url: decode(href),
+        page: folders.length ? folders[folders.length - 1] : "",
+      });
+    } else {
+      stack.pop();
+    }
+  }
+  return out;
+}
+
+function parseImport(text) {
+  const trimmed = text.trim();
+  if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+    const doc = JSON.parse(trimmed);
+    const list = Array.isArray(doc) ? doc : doc && doc.shortcuts;
+    if (!Array.isArray(list)) throw new Error("no shortcuts in JSON");
+    return list
+      .filter((s) => s && typeof s.name === "string" && typeof s.url === "string")
+      .map((s) => ({
+        name: s.name,
+        url: s.url,
+        iconUrl: typeof s.iconUrl === "string" ? s.iconUrl : "",
+        page: normalizePage(s.page),
+      }));
+  }
+  const items = parseBookmarksHtml(text);
+  if (!items.length) throw new Error("no bookmarks found");
+  return items;
+}
+
+$("exportBtn").addEventListener("click", () => {
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "favorites-export-" + new Date().toISOString().slice(0, 10) + ".json";
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
+
+$("importBtn").addEventListener("click", () => $("importFile").click());
+
+$("importFile").addEventListener("change", async () => {
+  const file = $("importFile").files[0];
+  $("importFile").value = "";
+  if (!file) return;
+  let incoming;
+  try {
+    incoming = parseImport(await file.text());
+  } catch (err) {
+    toast("Import failed: " + err.message);
+    return;
+  }
+  // Merge, never replace: same URL on the same page = already there.
+  const key = (sc) => String(sc.url || "").trim().toLowerCase().replace(/\/+$/, "") + "|" + pageOf(sc);
+  const seen = new Set(state.shortcuts.map(key));
+  const before = state.shortcuts.length;
+  for (const b of incoming) {
+    if (seen.has(key(b))) continue;
+    seen.add(key(b));
+    const sc = { id: newShortcutId(), name: b.name, url: b.url };
+    if (b.iconUrl) sc.iconUrl = b.iconUrl;
+    if (b.page) sc.page = b.page;
+    state.shortcuts.push(sc);
+  }
+  const added = state.shortcuts.length - before;
+  // Leave headroom under the server's 100 KB PUT cap.
+  if (JSON.stringify(state).length > 95 * 1024) {
+    state = loadState();
+    toast("Import too large — it would exceed the 100 KB sync limit");
+    return;
+  }
+  if (added > 0) persist();
+  else render();
+  toast("Imported " + added + " shortcut" + (added === 1 ? "" : "s") +
+    (incoming.length - added > 0 ? " (" + (incoming.length - added) + " already present)" : ""));
+  $("settingsDialog").close();
 });
 
 /* ---------- toast ---------- */
