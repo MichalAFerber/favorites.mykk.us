@@ -452,7 +452,12 @@ function makeIcon(sc) {
 function render() {
   const grid = $("grid");
   grid.replaceChildren();
-  for (const sc of state.shortcuts) {
+  // Display order only — the stored array is left untouched so sorting never
+  // counts as a document edit for sync purposes.
+  const sorted = [...state.shortcuts].sort((a, b) =>
+    (a.name || "").localeCompare(b.name || "", undefined, { sensitivity: "base", numeric: true })
+  );
+  for (const sc of sorted) {
     const tile = document.createElement("a");
     tile.className = "tile";
     tile.href = sc.url;

@@ -42,7 +42,9 @@ Run the REAL worker behind a tiny Node adapter (assets-first, like Cloudflare):
 
 ## Flows worth driving
 
-add → tiles render; bare-domain URL normalization; HTML-in-name stays inert;
+add → tiles render A→Z regardless of insertion order (case-insensitive,
+numeric-aware; stored array keeps insertion order — sort is display-only);
+bare-domain URL normalization; HTML-in-name stays inert;
 long-press → edit dialog; two-tap delete (first tap arms, second deletes);
 settings theme/bgColor; configure sync on device A → push; fresh device B
 configure sync → pulls (must NOT clobber remote with its empty doc); bad token
