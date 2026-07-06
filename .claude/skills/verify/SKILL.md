@@ -51,4 +51,7 @@ configure sync → pulls (must NOT clobber remote with its empty doc); bad token
 → "Pull failed" status + page still usable locally; wallpaper URL with `"` and
 `)` stays inside one escaped `url("…")`; two different users' tokens read and
 write different `state:<userId>` docs (no cross-user bleed); custom `iconUrl`
-on a shortcut is used as the img src instead of DuckDuckGo.
+on a shortcut is used as the img src instead of DuckDuckGo; `?p=homelab` shows
+only that page's shortcuts (page names lowercase-normalized, pageless = main
+page), add-dialog prefills the current page, chip nav appears once named pages
+exist, and pages survive a sync round-trip.
