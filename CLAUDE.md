@@ -53,14 +53,16 @@ State document shape (per user):
 
 ```json
 {
-  "shortcuts": [{ "id": "sc_...", "name": "GitHub", "url": "https://github.com", "iconUrl": "https://…/icon.png" }],
+  "shortcuts": [{ "id": "sc_...", "name": "GitHub", "url": "https://github.com", "iconUrl": "https://…/icon.png", "page": "homelab" }],
   "settings": { "theme": "dark", "wallpaperUrl": "", "bgColor": "" },
   "updatedAt": 1751600000000
 }
 ```
 
 `iconUrl` is optional — when present it overrides the favicon service for
-that shortcut.
+that shortcut. `page` is optional — it assigns the shortcut to a named page
+(lowercase-normalized) shown via `?p=<page>` in the UI; absent means the
+main page.
 
 Conflict model is last-write-wins on `updatedAt`, whole document, per user.
 This is deliberate — users never share a document, so do not introduce
@@ -77,6 +79,13 @@ there is no endpoint setting.
 cd favorites
 wrangler deploy
 ```
+
+The repo is also connected to the Worker via Workers Builds (Git
+integration): every push to `main` after the connection triggers a build
+that runs `npx wrangler deploy`. The build's **root directory must be
+`favorites`** — the wrangler config is not at the repo root. Note that
+connecting the repo does not build retroactively; only pushes made after
+the connection fire builds.
 
 ## Users and tokens
 
@@ -122,6 +131,9 @@ users is fine; watch this before inviting more.
   do not swap to Google's favicon service), with letter-avatar fallback. A
   shortcut's optional `iconUrl` overrides the favicon service entirely.
 - Page must remain fully functional with sync unconfigured (local-only mode).
+- Multiple pages: `?p=homelab` filters the grid to that page's shortcuts; no
+  param = main page. Filtering is display-only — pages live inside the one
+  synced document, and page names are normalized to lowercase.
 - Long-press = edit/delete. Pointer Events, 500 ms threshold, 10 px move
   tolerance. Native `confirm()` is banned (breaks in sandboxed iframes);
   destructive actions use two-tap confirm.
