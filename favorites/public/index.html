@@ -299,8 +299,10 @@
     <option value="dark">Dark</option>
     <option value="light">Light</option>
   </select>
-  <label for="setWallpaper">Wallpaper URL</label>
+  <label for="setWallpaper">Desktop wallpaper URL</label>
   <input type="text" id="setWallpaper" autocomplete="off" placeholder="https://…/image.jpg (optional)">
+  <label for="setWallpaperMobile">Mobile wallpaper URL</label>
+  <input type="text" id="setWallpaperMobile" autocomplete="off" placeholder="https://…/phone.jpg (optional — screens under 600px)">
   <label for="setBgColor">Background color</label>
   <input type="text" id="setBgColor" autocomplete="off" placeholder="#111418 (optional)">
 
@@ -349,7 +351,7 @@ function defaultState() {
   return {
     shortcuts: [],
     // pageSort maps a page name to "manual"; absent = alphabetical.
-    settings: { theme: "dark", wallpaperUrl: "", bgColor: "", pageSort: {} },
+    settings: { theme: "dark", wallpaperUrl: "", wallpaperUrlMobile: "", bgColor: "", pageSort: {} },
     updatedAt: 0,
   };
 }
@@ -494,11 +496,17 @@ function cssUrl(u) {
   return 'url("' + String(u).replace(/[\\"]/g, "\\$&").replace(/[\n\r]/g, "") + '")';
 }
 
+// Screens under 600px get the mobile wallpaper when one is set; the
+// listener re-applies on resize/rotation.
+const mobileViewport = matchMedia("(max-width: 599px)");
+mobileViewport.addEventListener("change", () => applySettings());
+
 function applySettings() {
   const s = state.settings;
   document.documentElement.dataset.theme = s.theme === "light" ? "light" : "dark";
   document.body.style.backgroundColor = s.bgColor || "";
-  document.body.style.backgroundImage = s.wallpaperUrl ? cssUrl(s.wallpaperUrl) : "";
+  const wallpaper = (mobileViewport.matches && s.wallpaperUrlMobile) || s.wallpaperUrl;
+  document.body.style.backgroundImage = wallpaper ? cssUrl(wallpaper) : "";
 }
 
 /* ---------- rendering (DOM built with createElement — no innerHTML for user data) ---------- */
@@ -841,6 +849,7 @@ $("settingsBtn").addEventListener("click", () => {
   const s = state.settings;
   $("setTheme").value = s.theme === "light" ? "light" : "dark";
   $("setWallpaper").value = s.wallpaperUrl || "";
+  $("setWallpaperMobile").value = s.wallpaperUrlMobile || "";
   $("setBgColor").value = s.bgColor || "";
   $("setDefaultPage").value = deviceDefaultPage;
   $("setToken").value = syncConfig ? syncConfig.token : "";
@@ -872,10 +881,13 @@ $("settingsSave").addEventListener("click", () => {
   const s = state.settings;
   const theme = $("setTheme").value === "light" ? "light" : "dark";
   const wallpaperUrl = $("setWallpaper").value.trim();
+  const wallpaperUrlMobile = $("setWallpaperMobile").value.trim();
   const bgColor = $("setBgColor").value.trim();
-  const docChanged = s.theme !== theme || s.wallpaperUrl !== wallpaperUrl || s.bgColor !== bgColor;
+  const docChanged = s.theme !== theme || s.wallpaperUrl !== wallpaperUrl ||
+    s.wallpaperUrlMobile !== wallpaperUrlMobile || s.bgColor !== bgColor;
   s.theme = theme;
   s.wallpaperUrl = wallpaperUrl;
+  s.wallpaperUrlMobile = wallpaperUrlMobile;
   s.bgColor = bgColor;
 
   $("settingsDialog").close();

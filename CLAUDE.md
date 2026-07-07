@@ -58,7 +58,7 @@ State document shape (per user):
 ```json
 {
   "shortcuts": [{ "id": "sc_...", "name": "GitHub", "url": "https://github.com", "iconUrl": "https://…/icon.png", "page": "homelab" }],
-  "settings": { "theme": "dark", "wallpaperUrl": "", "bgColor": "", "pageSort": { "homelab": "manual" } },
+  "settings": { "theme": "dark", "wallpaperUrl": "", "wallpaperUrlMobile": "", "bgColor": "", "pageSort": { "homelab": "manual" } },
   "updatedAt": 1751600000000
 }
 ```
@@ -153,7 +153,9 @@ users is fine; watch this before inviting more.
   offline fallback. A shortcut's optional `iconUrl` overrides the proxy
   entirely (icons8, simpleicons, any image CDN).
 - Wallpaper renders `contain` / `no-repeat` / `center` / `fixed` — the
-  bgColor letterboxes around it.
+  bgColor letterboxes around it. Viewports under 600px use
+  `wallpaperUrlMobile` when set (falling back to the desktop wallpaper),
+  via a matchMedia listener so rotation/resize re-applies live.
 - Page must remain fully functional with sync unconfigured (local-only mode).
 - Multiple pages: `?p=homelab` filters the grid to that page's shortcuts; no
   param = main page. Filtering is display-only — pages live inside the one
