@@ -43,6 +43,10 @@ GET  /api/state   Authorization: Bearer <user's token>
 PUT  /api/state   Authorization: Bearer <user's token>, body = JSON ≤ 100 KB
   → 200 {"ok":true}
   → 400 bad json | 401 bad/missing token | 413 too large
+GET  /icon?host=<hostname>   (unauthenticated — serves <img> tags)
+  → always 200 image: Dashboard Icons → DuckDuckGo favicon → site
+    /favicon.ico → generated letter-avatar SVG. 400 for non-hostname
+    input. Edge-cached; never 404s (that's the point — no console noise).
 ```
 
 The token is the entire identity: the Worker hashes it (SHA-256), looks up
@@ -131,9 +135,15 @@ users is fine; watch this before inviting more.
 - Single file. Inline CSS + JS. No bundler, no npm, no CDN dependencies.
 - All state mutations go through `persist()` — never call the cache or sync
   layer directly from a handler.
-- Favicons come from `icons.duckduckgo.com/ip3/<host>.ico` (privacy choice —
-  do not swap to Google's favicon service), with letter-avatar fallback. A
-  shortcut's optional `iconUrl` overrides the favicon service entirely.
+- Tile icons come from the Worker's same-origin `/icon?host=` proxy
+  (Dashboard Icons → DuckDuckGo → site favicon → letter-avatar SVG), so the
+  client never talks to third-party icon services and never logs 404s. The
+  DuckDuckGo step is a privacy choice — do not swap it for Google's favicon
+  service. `img.onerror` keeps the client-side letter avatar as the
+  offline fallback. A shortcut's optional `iconUrl` overrides the proxy
+  entirely (icons8, simpleicons, any image CDN).
+- Wallpaper renders `contain` / `no-repeat` / `center` / `fixed` — the
+  bgColor letterboxes around it.
 - Page must remain fully functional with sync unconfigured (local-only mode).
 - Multiple pages: `?p=homelab` filters the grid to that page's shortcuts; no
   param = main page. Filtering is display-only — pages live inside the one
