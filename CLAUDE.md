@@ -137,6 +137,12 @@ users is fine; watch this before inviting more.
   layer directly from a handler.
 - Tile icons come from the Worker's same-origin `/icon?host=` proxy
   (Dashboard Icons → DuckDuckGo → site favicon → letter-avatar SVG), so the
+  Dashboard Icons slugs are tried most-specific first: a small host alias
+  map (gmail, outlook), then `<brand>-<subdomain>` (google-calendar,
+  proton-mail), then the bare brand — never generic before specific, or
+  every Google product tile shows the G. Bump the `v=` in the icon URLs
+  (worker cacheKey + index.html img src) when resolution logic changes;
+  icons are cached for days at the edge and in browsers. The
   client never talks to third-party icon services and never logs 404s. The
   DuckDuckGo step is a privacy choice — do not swap it for Google's favicon
   service. `img.onerror` keeps the client-side letter avatar as the

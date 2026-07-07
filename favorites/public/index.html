@@ -531,7 +531,7 @@ function makeIcon(sc) {
   // A user-supplied iconUrl wins; otherwise the Worker's same-origin /icon
   // proxy resolves Dashboard Icons → favicon → letter avatar (always 200,
   // so no 404 console noise). onerror stays as the offline/local fallback.
-  img.src = sc.iconUrl || "/icon?host=" + encodeURIComponent(host);
+  img.src = sc.iconUrl || "/icon?v=2&host=" + encodeURIComponent(host);
   img.onerror = makeAvatar;
   wrap.appendChild(img);
   return wrap;
