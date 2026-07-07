@@ -32,6 +32,14 @@ Run the REAL worker behind a tiny Node adapter (assets-first, like Cloudflare):
 - Long-press: `mouse.move` to tile center, `mouse.down()`, wait 650 ms, `mouse.up()`.
 - Sync push is debounced 800 ms — wait ≥1.2 s before asserting on remote state.
 
+## Icon proxy (/icon)
+
+worker.js's `/icon?host=` chain fetches jsdelivr (Dashboard Icons) → DuckDuckGo
+→ site favicon. The harness mocks those upstreams in `globalThis.fetch` (the
+sandbox has no external network) and polyfills `caches.default` + `ctx`. The
+mocked PNG must be a REAL decodable image — `<img>` fires onerror on garbage
+bytes and the tile falls back to the letter avatar, failing icon assertions.
+
 ## Gotchas
 
 - External hosts (icons.duckduckgo.com) stall ~10 s then `ERR_CONNECTION_RESET`

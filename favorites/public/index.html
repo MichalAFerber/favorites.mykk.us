@@ -41,7 +41,8 @@
     font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     color: var(--fg);
     background-color: var(--bg);
-    background-size: cover;
+    background-size: contain;
+    background-repeat: no-repeat;
     background-position: center;
     background-attachment: fixed;
   }
@@ -277,7 +278,8 @@
     <label for="editUrl">URL</label>
     <input type="text" id="editUrl" required autocomplete="off" placeholder="https://example.com" inputmode="url">
     <label for="editIconUrl">Icon URL</label>
-    <input type="text" id="editIconUrl" autocomplete="off" placeholder="https://…/icon.png (optional — overrides the favicon)" inputmode="url">
+    <input type="text" id="editIconUrl" autocomplete="off" placeholder="https://…/icon.png (optional)" inputmode="url">
+    <p class="hint">Leave empty to auto-detect (Dashboard Icons, then the site's favicon) — or paste a URL from icons8.com, simpleicons.org, or any image CDN.</p>
     <label for="editPage">Page</label>
     <input type="text" id="editPage" autocomplete="off" maxlength="40" placeholder="e.g. homelab (blank = main page)">
     <div class="row">
@@ -512,19 +514,25 @@ function makeIcon(sc) {
   wrap.className = "icon";
   let host = "";
   try { host = new URL(sc.url).hostname; } catch {}
-  const img = document.createElement("img");
-  img.alt = "";
-  img.loading = "lazy";
-  // A user-supplied iconUrl overrides the favicon service; both fall back to
-  // the letter avatar on load failure.
-  img.src = sc.iconUrl || "https://icons.duckduckgo.com/ip3/" + host + ".ico";
-  img.onerror = () => {
+  const makeAvatar = () => {
     const avatar = document.createElement("div");
     avatar.className = "avatar";
     avatar.style.background = avatarColor(sc.name || host || "?");
     avatar.textContent = (sc.name || host || "?").trim().charAt(0).toUpperCase() || "?";
     wrap.replaceChildren(avatar);
   };
+  if (!sc.iconUrl && !host) {
+    makeAvatar();
+    return wrap;
+  }
+  const img = document.createElement("img");
+  img.alt = "";
+  img.loading = "lazy";
+  // A user-supplied iconUrl wins; otherwise the Worker's same-origin /icon
+  // proxy resolves Dashboard Icons → favicon → letter avatar (always 200,
+  // so no 404 console noise). onerror stays as the offline/local fallback.
+  img.src = sc.iconUrl || "/icon?host=" + encodeURIComponent(host);
+  img.onerror = makeAvatar;
   wrap.appendChild(img);
   return wrap;
 }
