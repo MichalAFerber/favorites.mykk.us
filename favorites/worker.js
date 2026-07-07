@@ -35,26 +35,53 @@ async function authenticate(request, env) {
 
 const ICON_MAX_BYTES = 512 * 1024;
 
-// Product hosts whose Dashboard Icons slug can't be derived from the name.
+// Product hosts whose icon slug can't be derived from host or name.
+// Every value verified to exist upstream before being added here.
 const ICON_HOST_ALIASES = {
   "mail.google.com": "gmail",
+  "aistudio.google.com": "google-ai-studio",
+  "search.google.com": "google-search-console",
   "outlook.cloud.microsoft": "microsoft-outlook",
   "outlook.office.com": "microsoft-outlook",
   "outlook.live.com": "microsoft-outlook",
+  "admin.microsoft.com": "microsoft-365-admin-center",
+  "admin.cloud.microsoft": "microsoft-365-admin-center",
+  "onedrive.live.com": "microsoft-onedrive",
 };
 
-// Most specific first: alias, then "<brand>-<subdomain>" (calendar.google.com
-// → google-calendar, mail.proton.me → proton-mail), then the bare brand —
-// otherwise every Google product tile would match google.png's generic G.
-function iconSlugCandidates(host) {
+// Slugs that exist upstream under a different name than users write.
+const ICON_SLUG_ALIASES = {
+  "onedrive": "microsoft-onedrive",
+};
+
+// dashboardicons.com aggregates several icon sets; these two live on
+// jsdelivr. Tried in order for every candidate slug.
+const ICON_SOURCES = [
+  (slug) => "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/" + slug + ".png",
+  (slug) => "https://cdn.jsdelivr.net/gh/selfhst/icons/png/" + slug + ".png",
+];
+
+// Most specific first: host alias, the shortcut's own name ("Google AI
+// Studio" → google-ai-studio — the strongest signal for products living
+// under paths or odd hosts), "<brand>-<subdomain>" (calendar.google.com →
+// google-calendar), true middle labels (console.firebase.google.com →
+// firebase), then the bare brand LAST — otherwise every Google product
+// tile matches google.png's generic G.
+function iconSlugCandidates(host, nameSlug) {
   const out = [];
   if (ICON_HOST_ALIASES[host]) out.push(ICON_HOST_ALIASES[host]);
-  const labels = host.replace(/^www\./, "").split(".");
-  const brand = labels.length >= 2 ? labels[labels.length - 2] : "";
-  const sub = labels.length >= 3 ? labels[0] : "";
-  if (brand && sub && sub !== brand) out.push(brand + "-" + sub);
+  if (nameSlug) out.push(ICON_SLUG_ALIASES[nameSlug] || nameSlug);
+  const parts = host.replace(/^www\./, "").split(".");
+  parts.pop(); // TLD
+  const brand = parts.pop() || "";
+  for (let i = parts.length - 1; i >= 0; i--) {
+    if (brand && parts[i] !== brand) out.push(brand + "-" + parts[i]);
+  }
+  // Only a true middle label (≥2 subdomain labels) — a bare first label like
+  // the "news" in news.ycombinator.com would match unrelated app icons.
+  if (parts.length >= 2) out.push(parts[parts.length - 1]);
   if (brand) out.push(brand);
-  return [...new Set(out)].filter((s) => /^[a-z0-9-]{2,}$/.test(s));
+  return [...new Set(out)].filter((s) => /^[a-z0-9-]{2,60}$/.test(s));
 }
 
 async function fetchIcon(iconUrl) {
@@ -99,18 +126,25 @@ async function handleIcon(request, url, ctx) {
   if (!/^[a-z0-9]([a-z0-9.-]{0,250})$/.test(host) || !host.includes(".")) {
     return jsonResponse(400, { error: "bad host" });
   }
+  const nameRaw = (url.searchParams.get("n") || "").trim().toLowerCase();
+  const nameSlug = /^[a-z0-9-]{2,60}$/.test(nameRaw) ? nameRaw : "";
   const cache = typeof caches !== "undefined" ? caches.default : null;
   // Bump the version (here and in index.html's /icon URLs) whenever the
   // resolution logic changes — edge + browser caches hold icons for days.
-  const cacheKey = new Request(url.origin + "/icon?v=2&host=" + encodeURIComponent(host));
+  const cacheKey = new Request(
+    url.origin + "/icon?v=3&host=" + encodeURIComponent(host) + "&n=" + encodeURIComponent(nameSlug)
+  );
   if (cache) {
     const hit = await cache.match(cacheKey);
     if (hit) return hit;
   }
   let res = null;
-  for (const slug of iconSlugCandidates(host)) {
-    res = await fetchIcon("https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/" + slug + ".png");
-    if (res) break;
+  outer:
+  for (const slug of iconSlugCandidates(host, nameSlug)) {
+    for (const source of ICON_SOURCES) {
+      res = await fetchIcon(source(slug));
+      if (res) break outer;
+    }
   }
   if (!res) res = await fetchIcon("https://icons.duckduckgo.com/ip3/" + host + ".ico");
   if (!res) res = await fetchIcon("https://" + host + "/favicon.ico");

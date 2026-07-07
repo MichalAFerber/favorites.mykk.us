@@ -58,7 +58,7 @@ State document shape (per user):
 ```json
 {
   "shortcuts": [{ "id": "sc_...", "name": "GitHub", "url": "https://github.com", "iconUrl": "https://…/icon.png", "page": "homelab" }],
-  "settings": { "theme": "dark", "wallpaperUrl": "", "bgColor": "", "pageSort": { "homelab": "manual" } },
+  "settings": { "theme": "dark", "wallpaperUrl": "", "wallpaperUrlMobile": "", "bgColor": "", "pageSort": { "homelab": "manual" } },
   "updatedAt": 1751600000000
 }
 ```
@@ -138,9 +138,13 @@ users is fine; watch this before inviting more.
 - Tile icons come from the Worker's same-origin `/icon?host=` proxy
   (Dashboard Icons → DuckDuckGo → site favicon → letter-avatar SVG), so the
   Dashboard Icons slugs are tried most-specific first: a small host alias
-  map (gmail, outlook), then `<brand>-<subdomain>` (google-calendar,
-  proton-mail), then the bare brand — never generic before specific, or
-  every Google product tile shows the G. Bump the `v=` in the icon URLs
+  map (gmail, outlook, admin-center), the slugified shortcut NAME (the
+  client sends `n=` — "Google AI Studio" → google-ai-studio, the strongest
+  signal for products under paths), `<brand>-<subdomain>` (google-calendar,
+  proton-mail), true middle labels (console.firebase.google.com →
+  firebase), then the bare brand — never generic before specific, or
+  every Google product tile shows the G. Each slug is tried against the
+  native Dashboard Icons repo, then selfh.st's (both on jsdelivr). Bump the `v=` in the icon URLs
   (worker cacheKey + index.html img src) when resolution logic changes;
   icons are cached for days at the edge and in browsers. The
   client never talks to third-party icon services and never logs 404s. The
@@ -149,7 +153,9 @@ users is fine; watch this before inviting more.
   offline fallback. A shortcut's optional `iconUrl` overrides the proxy
   entirely (icons8, simpleicons, any image CDN).
 - Wallpaper renders `contain` / `no-repeat` / `center` / `fixed` — the
-  bgColor letterboxes around it.
+  bgColor letterboxes around it. Viewports under 600px use
+  `wallpaperUrlMobile` when set (falling back to the desktop wallpaper),
+  via a matchMedia listener so rotation/resize re-applies live.
 - Page must remain fully functional with sync unconfigured (local-only mode).
 - Multiple pages: `?p=homelab` filters the grid to that page's shortcuts; no
   param = main page. Filtering is display-only — pages live inside the one
