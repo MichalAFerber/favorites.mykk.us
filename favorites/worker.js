@@ -35,13 +35,25 @@ async function authenticate(request, env) {
 
 const ICON_MAX_BYTES = 512 * 1024;
 
-// "my.wyze.com" → ["wyze", "my"]: the registrable label first, then the
-// subdomain — opportunistic guesses at a Dashboard Icons slug.
+// Product hosts whose Dashboard Icons slug can't be derived from the name.
+const ICON_HOST_ALIASES = {
+  "mail.google.com": "gmail",
+  "outlook.cloud.microsoft": "microsoft-outlook",
+  "outlook.office.com": "microsoft-outlook",
+  "outlook.live.com": "microsoft-outlook",
+};
+
+// Most specific first: alias, then "<brand>-<subdomain>" (calendar.google.com
+// → google-calendar, mail.proton.me → proton-mail), then the bare brand —
+// otherwise every Google product tile would match google.png's generic G.
 function iconSlugCandidates(host) {
-  const labels = host.split(".");
   const out = [];
-  if (labels.length >= 2) out.push(labels[labels.length - 2]);
-  if (labels.length >= 3 && labels[0] !== "www") out.push(labels[0]);
+  if (ICON_HOST_ALIASES[host]) out.push(ICON_HOST_ALIASES[host]);
+  const labels = host.replace(/^www\./, "").split(".");
+  const brand = labels.length >= 2 ? labels[labels.length - 2] : "";
+  const sub = labels.length >= 3 ? labels[0] : "";
+  if (brand && sub && sub !== brand) out.push(brand + "-" + sub);
+  if (brand) out.push(brand);
   return [...new Set(out)].filter((s) => /^[a-z0-9-]{2,}$/.test(s));
 }
 
@@ -88,7 +100,9 @@ async function handleIcon(request, url, ctx) {
     return jsonResponse(400, { error: "bad host" });
   }
   const cache = typeof caches !== "undefined" ? caches.default : null;
-  const cacheKey = new Request(url.origin + "/icon?host=" + encodeURIComponent(host));
+  // Bump the version (here and in index.html's /icon URLs) whenever the
+  // resolution logic changes — edge + browser caches hold icons for days.
+  const cacheKey = new Request(url.origin + "/icon?v=2&host=" + encodeURIComponent(host));
   if (cache) {
     const hit = await cache.match(cacheKey);
     if (hit) return hit;
