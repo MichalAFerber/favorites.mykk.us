@@ -154,7 +154,7 @@ users is fine; watch this before inviting more.
   entirely (icons8, simpleicons, any image CDN).
 - Wallpaper renders `cover` / `no-repeat` / `center` / `fixed` — it fills
   the viewport (cropping overflow) now that each device class can have a
-  properly shaped image. Viewports under 600px use
+  properly shaped image. Viewports under 800px use
   `wallpaperUrlMobile` when set (falling back to the desktop wallpaper),
   via a matchMedia listener so rotation/resize re-applies live.
 - Page must remain fully functional with sync unconfigured (local-only mode).

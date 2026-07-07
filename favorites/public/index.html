@@ -302,7 +302,7 @@
   <label for="setWallpaper">Desktop wallpaper URL</label>
   <input type="text" id="setWallpaper" autocomplete="off" placeholder="https://…/image.jpg (optional)">
   <label for="setWallpaperMobile">Mobile wallpaper URL</label>
-  <input type="text" id="setWallpaperMobile" autocomplete="off" placeholder="https://…/phone.jpg (optional — screens under 600px)">
+  <input type="text" id="setWallpaperMobile" autocomplete="off" placeholder="https://…/phone.jpg (optional — screens under 800px)">
   <label for="setBgColor">Background color</label>
   <input type="text" id="setBgColor" autocomplete="off" placeholder="#111418 (optional)">
 
@@ -496,9 +496,9 @@ function cssUrl(u) {
   return 'url("' + String(u).replace(/[\\"]/g, "\\$&").replace(/[\n\r]/g, "") + '")';
 }
 
-// Screens under 600px get the mobile wallpaper when one is set; the
+// Screens under 800px get the mobile wallpaper when one is set; the
 // listener re-applies on resize/rotation.
-const mobileViewport = matchMedia("(max-width: 599px)");
+const mobileViewport = matchMedia("(max-width: 799px)");
 mobileViewport.addEventListener("change", () => applySettings());
 
 function applySettings() {
