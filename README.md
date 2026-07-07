@@ -13,6 +13,7 @@ A fast, self-hosted favorites (speed-dial) page that syncs across devices. One C
 - **Open how you like** — plain click opens in place; **Ctrl/Cmd-click** a new tab, **Shift-click** a new window, and right-click gives the normal browser menu.
 - **Long-press to edit or delete** — 500 ms hold on any tile. Deletion uses a two-tap confirm (no browser `confirm()` dialogs).
 - **Themes and backdrop** — dark or light theme, an optional background color, and separate **desktop and mobile wallpapers** (screens under 800px get the mobile image, live on rotate/resize).
+- **Responsive layout** — tiles use large icons in a grid that packs as many per row as fit, dropping to exactly **three per row on portrait phones** (under 500px). The mobile wallpaper has its own, wider breakpoint (under 800px), so a phone in landscape keeps its wallpaper while switching to the denser grid.
 - **Import & export** — Settings → Data exports the full document as JSON, and imports either that JSON or a browser bookmarks HTML file (folders become pages). Imports merge and de-duplicate; nothing is overwritten.
 - **Cross-device sync, one field** — paste your sync token under Settings → Sync and every device converges on the same favorites and settings. Leave it blank and the app is fully functional local-only.
 - **Per-device default page** — each device can open to a different page (e.g. a `mobile` page on your phone) without affecting the synced document.
