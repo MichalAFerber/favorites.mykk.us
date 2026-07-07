@@ -530,8 +530,13 @@ function makeIcon(sc) {
   img.loading = "lazy";
   // A user-supplied iconUrl wins; otherwise the Worker's same-origin /icon
   // proxy resolves Dashboard Icons → favicon → letter avatar (always 200,
-  // so no 404 console noise). onerror stays as the offline/local fallback.
-  img.src = sc.iconUrl || "/icon?v=2&host=" + encodeURIComponent(host);
+  // so no 404 console noise). The shortcut's name rides along — "Google AI
+  // Studio" → google-ai-studio is often the best slug match. onerror stays
+  // as the offline/local fallback.
+  const nameSlug = (sc.name || "").toLowerCase().replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "").slice(0, 60);
+  img.src = sc.iconUrl || "/icon?v=3&host=" + encodeURIComponent(host) +
+    (nameSlug.length >= 2 ? "&n=" + encodeURIComponent(nameSlug) : "");
   img.onerror = makeAvatar;
   wrap.appendChild(img);
   return wrap;
