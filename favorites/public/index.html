@@ -103,16 +103,22 @@
 
   #grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
     gap: 12px;
+  }
+  /* Portrait phones only: exactly 3 per row. Landscape phones and wider
+     (≥500px) use the auto-fill grid, even though the mobile *wallpaper*
+     still applies up to 800px. */
+  @media (max-width: 499px) {
+    #grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   }
 
   .tile {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 10px;
-    padding: 18px 8px 14px;
+    gap: 8px;
+    padding: 12px 6px 10px;
     border-radius: 16px;
     background: var(--tile-bg);
     color: var(--fg);
@@ -133,27 +139,27 @@
   }
 
   .tile .icon {
-    width: 44px;
-    height: 44px;
-    border-radius: 10px;
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
     display: flex;
     align-items: center;
     justify-content: center;
     overflow: hidden;
   }
   .tile .icon img {
-    width: 32px;
-    height: 32px;
+    width: 44px;
+    height: 44px;
     max-width: 100%;
   }
   .tile .avatar {
-    width: 44px;
-    height: 44px;
-    border-radius: 10px;
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 20px;
+    font-size: 24px;
     font-weight: 600;
     color: #fff;
   }
@@ -302,7 +308,7 @@
   <label for="setWallpaper">Desktop wallpaper URL</label>
   <input type="text" id="setWallpaper" autocomplete="off" placeholder="https://…/image.jpg (optional)">
   <label for="setWallpaperMobile">Mobile wallpaper URL</label>
-  <input type="text" id="setWallpaperMobile" autocomplete="off" placeholder="https://…/phone.jpg (optional — screens under 600px)">
+  <input type="text" id="setWallpaperMobile" autocomplete="off" placeholder="https://…/phone.jpg (optional — screens under 800px)">
   <label for="setBgColor">Background color</label>
   <input type="text" id="setBgColor" autocomplete="off" placeholder="#111418 (optional)">
 
@@ -496,9 +502,9 @@ function cssUrl(u) {
   return 'url("' + String(u).replace(/[\\"]/g, "\\$&").replace(/[\n\r]/g, "") + '")';
 }
 
-// Screens under 600px get the mobile wallpaper when one is set; the
+// Screens under 800px get the mobile wallpaper when one is set; the
 // listener re-applies on resize/rotation.
-const mobileViewport = matchMedia("(max-width: 599px)");
+const mobileViewport = matchMedia("(max-width: 799px)");
 mobileViewport.addEventListener("change", () => applySettings());
 
 function applySettings() {

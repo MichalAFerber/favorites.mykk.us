@@ -7,10 +7,16 @@ A fast, self-hosted favorites (speed-dial) page that syncs across devices. One C
 ## Features
 
 - **Speed-dial grid** — add a name and a URL, get a tile. Bare domains work; `example.com` becomes `https://example.com` automatically, in both the add and edit dialogs.
-- **Icons that just work** — favicons come from DuckDuckGo's icon service (a privacy choice over Google's), with a colored letter-avatar fallback. Any favorite can also set an explicit **Icon URL** that overrides the favicon — useful when a site's favicon is missing or ugly.
+- **Icons that just work** — a same-origin icon proxy resolves each tile through [Dashboard Icons](https://dashboardicons.com) (high-quality product logos, matched by host and by the shortcut's name), then DuckDuckGo's favicon service (a privacy choice over Google's), then the site's own favicon, then a colored letter-avatar — always returning an image, so there are no `404`s in the console. Any favorite can also set an explicit **Icon URL** (icons8, simpleicons, any image CDN) that overrides the whole chain.
+- **Pages** — group tiles onto named pages via `?p=homelab`; a chip bar switches between them and the bare URL shows the main page. Page assignment is a per-favorite field; a tab-style **Home** chip always gets you back.
+- **Sort your way** — tiles are alphabetical by default, or switch a page to **manual** with the header toggle and long-press-drag tiles into any order. Sort mode is remembered per page and synced.
+- **Open how you like** — plain click opens in place; **Ctrl/Cmd-click** a new tab, **Shift-click** a new window, and right-click gives the normal browser menu.
 - **Long-press to edit or delete** — 500 ms hold on any tile. Deletion uses a two-tap confirm (no browser `confirm()` dialogs).
-- **Themes and backdrop** — dark or light theme, optional wallpaper URL, optional background color.
+- **Themes and backdrop** — dark or light theme, an optional background color, and separate **desktop and mobile wallpapers** (screens under 800px get the mobile image, live on rotate/resize).
+- **Responsive layout** — tiles use large icons in a grid that packs as many per row as fit, dropping to exactly **three per row on portrait phones** (under 500px). The mobile wallpaper has its own, wider breakpoint (under 800px), so a phone in landscape keeps its wallpaper while switching to the denser grid.
+- **Import & export** — Settings → Data exports the full document as JSON, and imports either that JSON or a browser bookmarks HTML file (folders become pages). Imports merge and de-duplicate; nothing is overwritten.
 - **Cross-device sync, one field** — paste your sync token under Settings → Sync and every device converges on the same favorites and settings. Leave it blank and the app is fully functional local-only.
+- **Per-device default page** — each device can open to a different page (e.g. a `mobile` page on your phone) without affecting the synced document.
 - **Multi-user, invite-only** — each user has their own token and their own isolated document. There is no signup, no login page, and no way for users to see each other's data.
 
 ## How it is built
@@ -19,29 +25,34 @@ A fast, self-hosted favorites (speed-dial) page that syncs across devices. One C
 favorites/
 ├── public/
 │   └── index.html    # the entire frontend: HTML + CSS + JS in one file
-├── worker.js         # /api/state handler + auth
+├── worker.js         # /api/state handler + auth, /icon proxy
 ├── issue-token.sh    # issue / map / revoke user tokens
 └── wrangler.toml     # bindings, assets dir, custom domain route
 ```
 
 - **Frontend** — one HTML file, inline CSS and JS, no bundler, no npm, no CDN dependencies. Cloudflare serves it as a static asset before the Worker is ever invoked.
-- **API** — the Worker handles exactly one route, `/api/state`:
+- **API** — the Worker handles two routes:
 
   ```
   GET  /api/state   Authorization: Bearer <token>   → the user's JSON document, or literal null
   PUT  /api/state   Authorization: Bearer <token>   → 200 {"ok":true} | 400 bad json | 401 | 413 > 100 KB
+  GET  /icon?host=<hostname>                         → always 200: an image (Dashboard Icons →
+                                                       DuckDuckGo → site favicon → letter-avatar SVG)
   ```
 
+- **Icon proxy** — `/icon` is unauthenticated and always returns an image, so the browser never talks to third-party icon services directly and never logs a `404`. Results are edge-cached for days; bumping the `v=` in the icon URL invalidates the cache when the resolution logic changes.
 - **Auth** — the bearer token *is* the identity. The Worker hashes it (SHA-256) and looks up `token:<hash>` → `userId` in KV; the user's document lives at `state:<userId>`. Plaintext tokens are never stored server-side, and the sync token lives only in each device's local storage — never inside the synced document.
+- **State document** — one JSON blob per user: `shortcuts` (each with a name, url, and optional `iconUrl` / `page`) plus `settings` (theme, desktop and mobile wallpaper URLs, background color, and per-page sort mode). The device-local default page is deliberately *not* in it.
 - **Sync model** — last-write-wins on the document's `updatedAt`, whole document, per user. Two of *your own* devices editing offline resolve to the newest write; different users can never touch each other's documents. No merging, no CRDTs — deliberately.
 - **Storage** — Workers KV, two key shapes (`token:<hash>` and `state:<userId>`), 100 KB cap per user document. The free tier allows 1,000 KV writes per day across all users; a handful of active users is fine.
 
 ## Using the app
 
 1. Open the site. Tap **+** to add a favorite; long-press a tile to edit or delete it.
-2. Optional per-favorite **Icon URL** in the same dialog overrides the favicon; clear it to revert.
-3. **Settings (gear)** — theme, wallpaper URL, background color, and the sync token.
-4. To sync a device: get a token from the owner, open Settings → Sync, paste it, save. That's the entire setup — the app always syncs against the site it was loaded from.
+2. In the add/edit dialog, set an optional **Page** (leave blank for the main page) and an optional **Icon URL** that overrides the auto-detected icon; clear it to revert.
+3. Use the **chip bar** to switch pages, or link straight to `?p=<page>`. The header **⇅** toggle switches the current page between alphabetical and manual order; in manual mode, long-press and drag tiles to rearrange them.
+4. **Settings (gear)** — theme, desktop and mobile wallpaper URLs, background color, this device's default page, the sync token, and **Data** (export / import).
+5. To sync a device: get a token from the owner, open Settings → Sync, paste it, save. That's the entire setup — the app always syncs against the site it was loaded from.
 
 ## Deploying your own
 
